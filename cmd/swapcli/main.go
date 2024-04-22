@@ -77,6 +77,20 @@ func cliApp() *cli.App {
 				},
 			},
 			{
+				Name:    "pairs",
+				Aliases: []string{"p"},
+				Usage:   "List active pairs",
+				Action:  runPairs,
+				Flags: []cli.Flag{
+					swapdPortFlag,
+					&cli.Uint64Flag{
+						Name:  flagSearchTime,
+						Usage: "Duration of time to search for, in seconds",
+						Value: defaultDiscoverSearchTimeSecs,
+					},
+				},
+			},
+			{
 				Name:    "balances",
 				Aliases: []string{"b"},
 				Usage:   "Show our Monero and Ethereum account balances",
@@ -169,30 +183,33 @@ func cliApp() *cli.App {
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:     flagMinAmount,
+						Aliases:  []string{"min"},
 						Usage:    "Minimum amount to be swapped, in XMR",
 						Required: true,
 					},
 					&cli.StringFlag{
 						Name:     flagMaxAmount,
+						Aliases:  []string{"max"},
 						Usage:    "Maximum amount to be swapped, in XMR",
 						Required: true,
 					},
 					&cli.StringFlag{
 						Name:     flagExchangeRate,
-						Usage:    "Desired exchange rate of XMR:ETH, eg. --exchange-rate=0.1 means 10XMR = 1ETH",
+						Usage:    "Desired exchange rate of XMR/ETH, eg. --exchange-rate=0.08 means 1 XMR = 0.08 ETH",
 						Required: true,
 					},
 					&cli.BoolFlag{
 						Name:  flagDetached,
-						Usage: "Exit immediately instead of subscribing to notifications about the swap's status",
+						Usage: "Exit immediately without subscribing to status notifications",
 					},
 					&cli.StringFlag{
 						Name:  flagToken,
-						Usage: "Use to pass the ethereum ERC20 token address to receive instead of ETH",
+						Usage: "Ethereum ERC20 token address to receive instead of ETH",
 					},
 					&cli.BoolFlag{
-						Name:  flagUseRelayer,
-						Usage: "Use the relayer even if the receiving account has enough ETH to claim",
+						Name:   flagUseRelayer,
+						Usage:  "Use the relayer even if the receiving account has enough ETH to claim",
+						Hidden: true, // useful for testing, but no clear end-user use case for the flag
 					},
 					swapdPortFlag,
 				},
@@ -215,12 +232,13 @@ func cliApp() *cli.App {
 					},
 					&cli.StringFlag{
 						Name:     flagProvidesAmount,
+						Aliases:  []string{"pa"},
 						Usage:    "Amount of coin to send in the swap",
 						Required: true,
 					},
 					&cli.BoolFlag{
 						Name:  flagDetached,
-						Usage: "Exit immediately instead of subscribing to notifications about the swap's status",
+						Usage: "Exit immediately without subscribing to status notifications",
 					},
 					swapdPortFlag,
 				},
@@ -251,7 +269,7 @@ func cliApp() *cli.App {
 			},
 			{
 				Name:   "cancel",
-				Usage:  "Cancel a ongoing swap if possible. Depending on the swap stage, this may not be possible.",
+				Usage:  "Cancel ongoing swap, if possible at the current swap stage.",
 				Action: runCancel,
 				Flags: []cli.Flag{
 					&cli.StringFlag{
@@ -308,8 +326,8 @@ func cliApp() *cli.App {
 				},
 			},
 			{
-				Name:    "suggested-exchange-rate",
-				Aliases: []string{"price-feed"},
+				Name:    "price-feed",
+				Aliases: []string{"suggested-exchange-rate"},
 				Usage:   "Returns the current mainnet exchange rate based on ETH/USD and XMR/USD price feeds.",
 				Action:  runSuggestedExchangeRate,
 				Flags:   []cli.Flag{swapdPortFlag},
@@ -529,6 +547,39 @@ func runPeers(ctx *cli.Context) error {
 	if len(resp.Addrs) == 0 {
 		fmt.Println("[none]")
 	}
+	return nil
+}
+
+func runPairs(ctx *cli.Context) error {
+	searchTime := ctx.Uint64(flagSearchTime)
+
+	c := newClient(ctx)
+	resp, err := c.Pairs(searchTime)
+	if err != nil {
+		return err
+	}
+
+	for i, a := range resp.Pairs {
+		var verified string
+		if a.Verified {
+			verified = "Yes"
+		} else {
+			verified = "No"
+		}
+
+		fmt.Printf("Pair %d:\n", i+1)
+		fmt.Printf("  Name: %s\n", a.Token.Symbol)
+		fmt.Printf("  Token: %s\n", a.Token.Address)
+		fmt.Printf("  Verified: %s\n", verified)
+		fmt.Printf("  Offers: %d\n", a.Offers)
+		fmt.Printf("  Reported Liquidity XMR: %f\n", a.ReportedLiquidityXMR)
+		fmt.Println()
+	}
+
+	if len(resp.Pairs) == 0 {
+		fmt.Println("[none]")
+	}
+
 	return nil
 }
 
@@ -853,7 +904,7 @@ func runGetOngoingSwap(ctx *cli.Context) error {
 		fmt.Printf("Start time: %s\n", info.StartTime.Format(common.TimeFmtSecs))
 		fmt.Printf("Provided: %s %s\n", info.ProvidedAmount.Text('f'), providedCoin)
 		fmt.Printf("Receiving: %s %s\n", info.ExpectedAmount.Text('f'), receivedCoin)
-		fmt.Printf("Exchange Rate: %s ETH/XMR\n", info.ExchangeRate)
+		fmt.Printf("Exchange Rate: %s XMR/ETH\n", info.ExchangeRate)
 		fmt.Printf("Status: %s\n", info.Status)
 		fmt.Printf("Time status was last updated: %s\n", info.LastStatusUpdateTime.Format(common.TimeFmtSecs))
 		if info.Timeout1 != nil && info.Timeout2 != nil {
@@ -925,7 +976,7 @@ func runGetPastSwap(ctx *cli.Context) error {
 			)
 		}
 		fmt.Printf("\n")
-		fmt.Printf("Exchange Rate: %s ETH/XMR\n", info.ExchangeRate)
+		fmt.Printf("Exchange Rate: %s XMR/ETH\n", info.ExchangeRate)
 		fmt.Printf("Status: %s\n", info.Status)
 	}
 
@@ -1139,8 +1190,8 @@ func runGetContractSwapInfo(ctx *cli.Context) error {
 	fmt.Printf("Swap struct as stored in the contract:\n")
 	fmt.Printf("\tOwner: %s\n", resp.Swap.Owner)
 	fmt.Printf("\tClaimer: %s\n", resp.Swap.Claimer)
-	fmt.Printf("\tPubKeyClaim: %x\n", resp.Swap.PubKeyClaim)
-	fmt.Printf("\tPubKeyRefund: %x\n", resp.Swap.PubKeyRefund)
+	fmt.Printf("\tClaimCommitment: %x\n", resp.Swap.ClaimCommitment)
+	fmt.Printf("\tRefundCommitment: %x\n", resp.Swap.RefundCommitment)
 	fmt.Printf("\tTimeout1: %s\n", resp.Swap.Timeout1)
 	fmt.Printf("\tTimeout2: %s\n", resp.Swap.Timeout2)
 	fmt.Printf("\tAsset: %s\n", resp.Swap.Asset)

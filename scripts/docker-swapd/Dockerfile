@@ -1,4 +1,4 @@
-FROM golang:1.20 as builder
+FROM golang:1.21 as builder
 
 # Download monero-wallet-rpc. We need bzip2 to unpack the tar file.
 RUN apt-get update && apt-get install -y bzip2
@@ -14,7 +14,7 @@ RUN go install -tags=prod \
     github.com/athanorlabs/atomic-swap/cmd/swapcli@"${VERSION}"
 RUN /go/bin/swapd --version
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y ca-certificates gosu
 
 # /usr/local/bin has swapd, swapcli, monero-wallet-rpc and

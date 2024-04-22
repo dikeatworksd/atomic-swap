@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	swapID = "/swap/0"
+	swapID = "/swap"
 )
 
 // Initiate attempts to initiate a swap with the given peer by sending a SendKeysMessage,
@@ -84,7 +84,7 @@ func (h *Host) receiveInitiateResponse(stream libp2pnetwork.Stream, s SwapState)
 
 		err := s.HandleProtocolMessage(msg)
 		if err != nil {
-			log.Warnf("failed to handle protocol message: err=%s", err)
+			log.Errorf("failed to handle protocol message: %s", err)
 			return
 		}
 	case <-time.After(initiateResponseTimeout):

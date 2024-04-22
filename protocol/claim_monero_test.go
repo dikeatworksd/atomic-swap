@@ -15,7 +15,7 @@ import (
 	"github.com/athanorlabs/atomic-swap/monero"
 	"github.com/athanorlabs/atomic-swap/protocol/swap"
 
-	logging "github.com/ipfs/go-log"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +26,7 @@ var (
 
 type mockSwapManager struct{}
 
-func (*mockSwapManager) WriteSwapToDB(info *swap.Info) error {
+func (*mockSwapManager) WriteSwapToDB(_ *swap.Info) error {
 	return nil
 }
 

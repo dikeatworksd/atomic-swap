@@ -14,7 +14,7 @@ jobs:
   unit-tests:
     strategy:
       matrix:
-        go-version: [1.20.x]
+        go-version: [1.21.x]
         platform: [ubuntu-22.04]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -64,6 +64,7 @@ jobs:
         env:
           ETH_MAINNET_ENDPOINT: ${{ secrets.ETH_MAINNET_ENDPOINT }}
           ETH_SEPOLIA_ENDPOINT: ${{ secrets.ETH_SEPOLIA_ENDPOINT }}
+          ETH_OPTIMISM_ENDPOINT: ${{ secrets.ETH_OPTIMISM_ENDPOINT }}
         run: ./scripts/run-unit-tests.sh
 
       - name: Upload code coverage
